@@ -1,0 +1,136 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "organization": {
+            "type": "string",
+            "defaultValue": "contoso",
+            "metadata": {
+                "description": "Organization name. For example: contoso"
+            }
+        },
+        "logDataRetention": {
+            "type": "int",
+            "defaultValue": 365,
+            "minValue": 0,
+            "maxValue": 365,
+            "metadata": {
+                "displayName": "Log retention in days",
+                "description": "Number of days data will be retained for"
+            }
+        },
+        "keyVaultOjectId": {
+            "type": "string",
+            "metadata": {
+                "description": "Specifies the object ID of a user, service principal or security group in the Azure Active Directory tenant to grant permissions to in Key Vault. Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlets."
+            }
+        },
+        "templateRootUri": {
+            "type": "string",
+            "metadata": {
+                "displayName": "Root URI for artifacts arm templates"
+            },
+            "defaultValue": "[deployment().properties.templateLink.uri]"
+        }
+    },
+    "variables": {
+        "deploymentUris": {
+            "storage": "[uri(parameters('templateRootUri'), 'Artifacts/sharedServices-diagnosticsStorage.json')]",
+            "keyvault": "[uri(parameters('templateRootUri'), 'Artifacts/sharedServices-keyVault.json')]",
+            "log": "[uri(parameters('templateRootUri'), 'Artifacts/sharedServices-logAnalytics.json')]"
+        },
+        "deploymentPrefix": "[concat(parameters('organization'), '-sharedsvcs')]",
+        "resourceGroupName": "[concat('rg-', variables('deploymentPrefix'))]",
+        "storageDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-st')]",
+        "keyVaultDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-kv')]",
+        "logDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-log')]"
+    },
+    "resources": [
+        // Creates resource group
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('resourceGroupName')]",
+            "location": "[deployment().location]",
+            "properties": {}
+        },
+
+        // Deploy storage account into resource group
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('storageDeploymentName')]",
+            "location": "[deployment().location]",
+            "resourceGroup": "[variables('resourceGroupName')]",
+            "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deploymentUris').storage]",
+                    "contentVersion":"1.0.0.0"
+                },
+                "parameters": {
+                    "deploymentPrefix": {
+                        "value": "[variables('deploymentPrefix')]"
+                    }
+                }
+            }
+        },
+
+        // Deploy key vault into resource group
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('keyVaultDeploymentName')]",
+            "location": "[deployment().location]",
+            "resourceGroup": "[variables('resourceGroupName')]",
+            "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deploymentUris').keyvault]",
+                    "contentVersion":"1.0.0.0"
+                },
+                "parameters": {
+                    "deploymentPrefix": {
+                        "value": "[variables('deploymentPrefix')]"
+                    },
+                    "objectId": {
+                        "value": "[parameters('keyVaultOjectId')]"
+                    }
+                }
+            }
+        },
+
+        // Deploy log analytics into resource group
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('logDeploymentName')]",
+            "location": "[deployment().location]",
+            "resourceGroup": "[variables('resourceGroupName')]",
+            "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deploymentUris').log]",
+                    "contentVersion":"1.0.0.0"
+                },
+                "parameters": {
+                    "deploymentPrefix": {
+                        "value": "[variables('deploymentPrefix')]"
+                    },
+                    "dataRetention": {
+                        "value": "[parameters('logDataRetention')]"
+                    }
+                }
+            }
+        }
+    ]
+}
