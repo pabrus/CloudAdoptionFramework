@@ -4,25 +4,25 @@
     "parameters": {
         "organization": {
             "type": "string",
-            "defaultValue": "contoso",
             "metadata": {
                 "description": "Organization name. For example: contoso"
-            }
+            },
+            "defaultValue": "contoso"
         },
         "logDataRetention": {
             "type": "int",
-            "defaultValue": 365,
             "minValue": 0,
             "maxValue": 365,
             "metadata": {
                 "displayName": "Log retention in days",
                 "description": "Number of days data will be retained for"
-            }
+            },
+            "defaultValue": 365
         },
         "keyVaultOjectId": {
             "type": "string",
             "metadata": {
-                "description": "Specifies the object ID of a user, service principal or security group in the Azure Active Directory tenant to grant permissions to in Key Vault. Get it by using Get-AzADUser or Get-AzADServicePrincipal cmdlets."
+                "description": "Specifies the object ID of a user, service principal or security group in the Azure Active Directory tenant to grant permissions in Key Vault."
             }
         },
         "templateRootUri": {
@@ -43,7 +43,10 @@
         "resourceGroupName": "[concat('rg-', variables('deploymentPrefix'))]",
         "storageDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-st')]",
         "keyVaultDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-kv')]",
-        "logDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-log')]"
+        "logDeploymentName": "[concat('deploy-', variables('deploymentPrefix'), '-log')]",
+
+        "logDeploymentId": "[concat(subscription().id, '/resourceGroups/', variables('resourceGroupName'), '/providers/Microsoft.Resources/deployments/', variables('logDeploymentName'))]",
+        "storageDeploymentId": "[concat(subscription().id, '/resourceGroups/', variables('resourceGroupName'), '/providers/Microsoft.Resources/deployments/', variables('storageDeploymentName'))]"
     },
     "resources": [
         // Creates resource group
@@ -60,7 +63,6 @@
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2020-10-01",
             "name": "[variables('storageDeploymentName')]",
-            "location": "[deployment().location]",
             "resourceGroup": "[variables('resourceGroupName')]",
             "dependsOn": [
                 "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
@@ -79,12 +81,37 @@
             }
         },
 
+        // Deploy log analytics into resource group
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-10-01",
+            "name": "[variables('logDeploymentName')]",
+            "resourceGroup": "[variables('resourceGroupName')]",
+            "dependsOn": [
+                "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('deploymentUris').log]",
+                    "contentVersion":"1.0.0.0"
+                },
+                "parameters": {
+                    "deploymentPrefix": {
+                        "value": "[variables('deploymentPrefix')]"
+                    },
+                    "dataRetention": {
+                        "value": "[parameters('logDataRetention')]"
+                    }
+                }
+            }
+        },
+
         // Deploy key vault into resource group
         {
             "type": "Microsoft.Resources/deployments",
             "apiVersion": "2020-10-01",
             "name": "[variables('keyVaultDeploymentName')]",
-            "location": "[deployment().location]",
             "resourceGroup": "[variables('resourceGroupName')]",
             "dependsOn": [
                 "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
@@ -106,30 +133,53 @@
             }
         },
 
-        // Deploy log analytics into resource group
+        // Deploy diagnostic setting for Activity log
         {
-            "type": "Microsoft.Resources/deployments",
-            "apiVersion": "2020-10-01",
-            "name": "[variables('logDeploymentName')]",
+            "type": "Microsoft.Insights/diagnosticSettings",
+            "apiVersion": "2017-05-01-preview",
             "location": "[deployment().location]",
-            "resourceGroup": "[variables('resourceGroupName')]",
+            "name": "default",
             "dependsOn": [
-                "[subscriptionResourceId('Microsoft.Resources/resourceGroups/', variables('resourceGroupName'))]"
+                "[variables('logDeploymentId')]",
+                "[variables('storageDeploymentId')]"
             ],
             "properties": {
-                "mode": "Incremental",
-                "templateLink": {
-                    "uri": "[variables('deploymentUris').log]",
-                    "contentVersion":"1.0.0.0"
-                },
-                "parameters": {
-                    "deploymentPrefix": {
-                        "value": "[variables('deploymentPrefix')]"
+                "workspaceId": "[reference(variables('logDeploymentName')).outputs.workspaceId.value]",
+                "storageAccountId": "[reference(variables('storageDeploymentName')).outputs.storageAccountId.value]",
+                "logs": [
+                    {
+                        "category": "Administrative",
+                        "enabled": true
                     },
-                    "dataRetention": {
-                        "value": "[parameters('logDataRetention')]"
+                    {
+                        "category": "Security",
+                        "enabled": true
+                    },
+                    {
+                        "category": "ServiceHealth",
+                        "enabled": true
+                    },
+                    {
+                        "category": "Alert",
+                        "enabled": true
+                    },
+                    {
+                        "category": "Recommendation",
+                        "enabled": true
+                    },
+                    {
+                        "category": "Policy",
+                        "enabled": true
+                    },
+                    {
+                        "category": "Autoscale",
+                        "enabled": true
+                    },
+                    {
+                        "category": "ResourceHealth",
+                        "enabled": true
                     }
-                }
+                ]
             }
         }
     ]

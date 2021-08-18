@@ -12,13 +12,13 @@
         },
         "dataRetention": {
             "type": "int",
-            "defaultValue": 365,
             "minValue": 0,
             "maxValue": 365,
             "metadata": {
                 "displayName": "Log retention in days",
                 "description": "Number of days data will be retained for"
-            }
+            },
+            "defaultValue": 365
         }
     },
     "variables": {
