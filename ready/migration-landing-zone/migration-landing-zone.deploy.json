@@ -19,7 +19,7 @@
             },
             "defaultValue": 365
         },
-        "keyVaultOjectId": {
+        "keyVaultObjectId": {
             "type": "string",
             "metadata": {
                 "description": "Specifies the object ID of a user, service principal or security group in the Azure Active Directory tenant to grant permissions in Key Vault."
@@ -74,8 +74,8 @@
                     "logDataRetention": {
                         "value": "[parameters('logDataRetention')]"
                     },
-                    "keyVaultOjectId": {
-                        "value": "[parameters('keyVaultOjectId')]"
+                    "keyVaultObjectId": {
+                        "value": "[parameters('keyVaultObjectId')]"
                     },
                     "templateRootUri": {
                         "value": "[parameters('templateRootUri')]"
